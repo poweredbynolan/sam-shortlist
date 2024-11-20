@@ -60,3 +60,6 @@ dist-ssr/
 
 # Tailwind CSS
 .tailwind/
+
+# Virtual Environment
+gov_contract_env/
