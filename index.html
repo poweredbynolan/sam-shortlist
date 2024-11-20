@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-white">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sam Shortlist</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/heroicons@2.0.18/dist/24/outline.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'imperial': '#e63946',
+                        'honeydew': '#f1faee',
+                        'powder': '#a8dadc',
+                        'celadon': '#457b9d',
+                        'prussian': '#1d3557'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="h-full flex flex-col">
+    <div class="min-h-full flex-grow">
+        <!-- Navigation -->
+        <nav class="bg-prussian">
+            <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <span class="text-white text-xl font-bold">Sam Shortlist</span>
+                        </div>
+                        <div class="hidden md:block">
+                            <div class="ml-10 flex items-baseline space-x-4">
+                                <a href="#" class="text-white hover:text-powder px-3 py-2 rounded-md text-sm font-medium">Browse</a>
+                                <a href="#" class="text-white hover:text-powder px-3 py-2 rounded-md text-sm font-medium">Saved</a>
+                                <a href="#" class="text-white hover:text-powder px-3 py-2 rounded-md text-sm font-medium">Help</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Search Section -->
+        <div class="bg-white shadow">
+            <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-12">
+                    <div class="md:col-span-6">
+                        <div class="relative rounded-md shadow-sm">
+                            <input type="text" id="keyword-search" 
+                                   class="block w-full rounded-md border-0 py-3 pl-4 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-celadon"
+                                   placeholder="Search opportunities (e.g., IT Services, Construction)">
+                        </div>
+                    </div>
+                    <div class="md:col-span-4">
+                        <div class="relative rounded-md shadow-sm">
+                            <input type="text" id="naics-search"
+                                   class="block w-full rounded-md border-0 py-3 pl-4 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:ring-2 focus:ring-celadon"
+                                   placeholder="NAICS Code">
+                        </div>
+                    </div>
+                    <div class="md:col-span-2">
+                        <button type="button" id="search-btn"
+                                class="w-full rounded-md bg-celadon px-3 py-3 text-sm font-semibold text-white shadow-sm hover:bg-prussian focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-celadon">
+                            Search
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-4">
+                <!-- Filters Sidebar -->
+                <div class="md:col-span-1">
+                    <div class="rounded-lg bg-white shadow">
+                        <div class="p-6">
+                            <h3 class="text-base font-semibold leading-6 text-gray-900">Filters</h3>
+                            
+                            <div class="mt-6">
+                                <label class="block text-sm font-medium text-gray-700">Notice Type</label>
+                                <select id="status-filter"
+                                        class="mt-2 block w-full rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-celadon sm:text-sm sm:leading-6">
+                                    <option value="">All Types</option>
+                                    <option value="p">Presolicitation</option>
+                                    <option value="o">Solicitation</option>
+                                    <option value="k">Combined Synopsis</option>
+                                    <option value="a">Award Notice</option>
+                                </select>
+                            </div>
+
+                            <div class="mt-6">
+                                <label class="block text-sm font-medium text-gray-700">Set-Aside Type</label>
+                                <select id="set-aside-filter"
+                                        class="mt-2 block w-full rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-celadon sm:text-sm sm:leading-6">
+                                    <option value="">Loading set-aside types...</option>
+                                </select>
+                            </div>
+
+                            <div class="mt-6">
+                                <label class="block text-sm font-medium text-gray-700">Organization</label>
+                                <select id="organization-filter"
+                                        class="mt-2 block w-full rounded-md border-0 py-2 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-celadon sm:text-sm sm:leading-6">
+                                    <option value="">Loading organizations...</option>
+                                </select>
+                            </div>
+
+                            <div class="mt-6">
+                                <label class="block text-sm font-medium text-gray-700">Quick Filters</label>
+                                <div class="mt-4 space-y-4">
+                                    <div class="flex items-center">
+                                        <input id="active-only" type="checkbox"
+                                               class="h-4 w-4 rounded border-gray-300 text-celadon focus:ring-celadon">
+                                        <label for="active-only" class="ml-3 text-sm text-gray-600">Active Only</label>
+                                    </div>
+                                    <div class="flex items-center">
+                                        <input id="with-attachments" type="checkbox"
+                                               class="h-4 w-4 rounded border-gray-300 text-celadon focus:ring-celadon">
+                                        <label for="with-attachments" class="ml-3 text-sm text-gray-600">With Attachments</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Opportunities List -->
+                <div class="md:col-span-3">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-lg font-semibold text-gray-900">Contract Opportunities</h2>
+                        <div class="flex items-center">
+                            <span class="text-sm text-gray-700 mr-2">Show:</span>
+                            <select id="page-size"
+                                    class="rounded-md border-0 py-1.5 pl-3 pr-10 text-gray-900 ring-1 ring-inset ring-gray-300 focus:ring-2 focus:ring-celadon sm:text-sm sm:leading-6">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Loading Spinner -->
+                    <div id="loading-spinner" class="hidden py-12 text-center">
+                        <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-current border-r-transparent text-celadon motion-reduce:animate-[spin_1.5s_linear_infinite]" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                    </div>
+
+                    <!-- Opportunities List -->
+                    <div id="opportunities-list" class="space-y-4">
+                        <!-- Opportunities will be dynamically inserted here -->
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="mt-6 flex items-center justify-between">
+                        <div class="text-sm text-gray-700" id="results-count">
+                            Showing <span id="showing-start">0</span> - <span id="showing-end">0</span> of <span id="total-results">0</span> results
+                        </div>
+                        <nav class="isolate inline-flex -space-x-px rounded-md shadow-sm" id="pagination">
+                            <!-- Pagination will be dynamically inserted here -->
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-prussian mt-auto">
+        <div class="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="text-sm font-semibold text-powder">About Sam Shortlist</h3>
+                    <p class="mt-4 text-sm text-white">Find and track federal contract opportunities from SAM.gov. Stay updated with the latest opportunities that match your business interests.</p>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-powder">Quick Links</h3>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="#" class="text-sm text-white hover:text-powder">Active Opportunities</a></li>
+                        <li><a href="#" class="text-sm text-white hover:text-powder">Search Tips</a></li>
+                        <li><a href="#" class="text-sm text-white hover:text-powder">NAICS Codes</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-sm font-semibold text-powder">Resources</h3>
+                    <ul class="mt-4 space-y-2">
+                        <li><a href="https://sam.gov" target="_blank" class="text-sm text-white hover:text-powder">SAM.gov Official Site</a></li>
+                        <li><a href="#" class="text-sm text-white hover:text-powder">Help Center</a></li>
+                        <li><a href="#" class="text-sm text-white hover:text-powder">Contact Support</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="mt-8 border-t border-powder/10 pt-8 text-center">
+                <p class="text-sm text-white">&copy; 2023 Sam Shortlist. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Opportunity Detail Modal -->
+    <div id="opportunityModal" class="hidden fixed inset-0 bg-gray-500 bg-opacity-75 overflow-y-auto">
+        <div class="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
+            <div class="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-2xl">
+                <div class="bg-white px-4 pb-4 pt-5 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:ml-4 sm:mt-0 sm:text-left w-full">
+                            <h3 class="text-base font-semibold leading-6 text-gray-900">Opportunity Details</h3>
+                            <div class="mt-4" id="modal-content">
+                                <!-- Opportunity details will be dynamically inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:flex sm:flex-row-reverse sm:px-6">
+                    <a href="#" id="view-on-sam" target="_blank"
+                       class="inline-flex w-full justify-center rounded-md bg-celadon px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-prussian sm:ml-3 sm:w-auto">
+                        View on SAM.gov
+                    </a>
+                    <button type="button" onclick="document.getElementById('opportunityModal').classList.add('hidden')"
+                            class="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

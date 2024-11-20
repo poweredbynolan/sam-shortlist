@@ -1,0 +1,2 @@
+contract_id,agency,vendor_name,contract_description,award_date,contract_value,contract_type,naics_code,place_of_performance,contract_duration,small_business,veteran_owned,woman_owned,minority_owned,subcontracting_plan,keywords
+12345,Department of Defense,Example Corp,Software development services,2023-01-15,1000000,Fixed Price,541511,"Washington, DC",365,True,False,True,False,Yes,"software, development, IT"
