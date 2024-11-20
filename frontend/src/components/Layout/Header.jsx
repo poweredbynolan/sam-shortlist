@@ -82,7 +82,11 @@ export default function Header() {
                             alt=""
                           />
                         ) : (
-                          <UserCircleIcon className="h-8 w-8 text-gray-400" aria-hidden="true" />
+                          <img
+                            className="h-8 w-8 rounded-full"
+                            src="https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=256&auto=format&fit=crop"
+                            alt="Default profile"
+                          />
                         )}
                       </Menu.Button>
                     </div>
