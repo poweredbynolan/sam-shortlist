@@ -33,17 +33,54 @@ export default function SearchPage() {
   }, [pagination.page]);
 
   const fetchSamOpportunities = async () => {
+    const startTime = Date.now();
     try {
+      console.log('Initiating SAM.gov opportunities fetch:', {
+        timestamp: new Date().toISOString(),
+        component: 'SearchPage'
+      });
+
       const data = await fetchSamData();
+      
+      console.log('SAM.gov opportunities fetch complete:', {
+        timestamp: new Date().toISOString(),
+        duration: `${Date.now() - startTime}ms`,
+        dataPoints: data.length,
+        categories: data.map(d => d.label)
+      });
+
       setSamOpportunities(data);
     } catch (err) {
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        duration: `${Date.now() - startTime}ms`,
+        component: 'SearchPage',
+        function: 'fetchSamOpportunities',
+        error: {
+          name: err.name,
+          message: err.message,
+          stack: err.stack,
+          details: err.details // From enhanced API error
+        }
+      };
+
+      console.error('Failed to fetch SAM.gov opportunities:', errorDetails);
       setError(err.message || 'Failed to fetch SAM.gov opportunities');
-      console.error(err);
     }
   };
 
   const fetchOpportunities = async () => {
+    const startTime = Date.now();
     try {
+      console.log('Initiating opportunities search:', {
+        timestamp: new Date().toISOString(),
+        query: searchQuery,
+        pagination: {
+          page: pagination.page,
+          pageSize: pagination.pageSize
+        }
+      });
+
       setLoading(true);
       const result = await searchOpportunities({
         query: searchQuery,
@@ -51,14 +88,39 @@ export default function SearchPage() {
         pageSize: pagination.pageSize
       });
       
+      console.log('Search completed successfully:', {
+        timestamp: new Date().toISOString(),
+        duration: `${Date.now() - startTime}ms`,
+        totalResults: result.total,
+        currentPage: pagination.page,
+        resultsReturned: result.opportunities.length
+      });
+
       setOpportunities(result.opportunities);
       setPagination(prev => ({
         ...prev,
         total: result.total
       }));
     } catch (err) {
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        duration: `${Date.now() - startTime}ms`,
+        component: 'SearchPage',
+        function: 'fetchOpportunities',
+        searchParams: {
+          query: searchQuery,
+          page: pagination.page,
+          pageSize: pagination.pageSize
+        },
+        error: {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        }
+      };
+
+      console.error('Failed to fetch opportunities:', errorDetails);
       setError(err.message || 'Failed to fetch opportunities');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -66,23 +128,75 @@ export default function SearchPage() {
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    console.log('Search initiated:', {
+      timestamp: new Date().toISOString(),
+      query: searchQuery,
+      currentPage: pagination.page
+    });
+
     setPagination(prev => ({ ...prev, page: 1 }));
     await fetchOpportunities();
   };
 
   const handlePageChange = (newPage) => {
+    console.log('Page change:', {
+      timestamp: new Date().toISOString(),
+      previousPage: pagination.page,
+      newPage: newPage,
+      totalPages: Math.ceil(pagination.total / pagination.pageSize)
+    });
+
     setPagination(prev => ({ ...prev, page: newPage }));
   };
 
   const handleSaveContract = async (contract) => {
-    if (!user) {
-      // Show sign-in prompt
-      return;
-    }
-    if (isContractSaved(contract.id)) {
-      await unsaveContract(contract.id);
-    } else {
-      await saveContract(contract);
+    const startTime = Date.now();
+    try {
+      if (!user) {
+        console.log('Save contract attempted without user:', {
+          timestamp: new Date().toISOString(),
+          contractId: contract.id
+        });
+        return;
+      }
+
+      const action = isContractSaved(contract.id) ? 'unsave' : 'save';
+      console.log(`Contract ${action} initiated:`, {
+        timestamp: new Date().toISOString(),
+        contractId: contract.id,
+        userId: user.id,
+        action: action
+      });
+
+      if (isContractSaved(contract.id)) {
+        await unsaveContract(contract.id);
+      } else {
+        await saveContract(contract);
+      }
+
+      console.log(`Contract ${action} completed:`, {
+        timestamp: new Date().toISOString(),
+        duration: `${Date.now() - startTime}ms`,
+        contractId: contract.id,
+        userId: user.id,
+        action: action
+      });
+    } catch (err) {
+      const errorDetails = {
+        timestamp: new Date().toISOString(),
+        duration: `${Date.now() - startTime}ms`,
+        component: 'SearchPage',
+        function: 'handleSaveContract',
+        contractId: contract.id,
+        userId: user?.id,
+        error: {
+          name: err.name,
+          message: err.message,
+          stack: err.stack
+        }
+      };
+
+      console.error('Failed to save/unsave contract:', errorDetails);
     }
   };
 
