@@ -1,14 +1,7 @@
 import { Fragment } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Disclosure, Menu, Transition } from '@headlessui/react';
-import { 
-  Bars3Icon, 
-  XMarkIcon, 
-  UserCircleIcon,
-  BellIcon,
-  BookmarkIcon,
-  Cog6ToothIcon,
-} from '@heroicons/react/24/outline';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useAuth } from '../../context/AuthContext';
 
 function classNames(...classes) {
@@ -17,38 +10,30 @@ function classNames(...classes) {
 
 export default function Header() {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const navigation = [
-    { name: 'Find Contracts', href: '/search' },
-    { name: 'Saved', href: '/saved' },
-    { name: 'Post Contract', href: '/post' },
-    { name: 'Help', href: '/help' }
+    { name: 'Search', href: '/search', current: true },
+    ...(user ? [
+      { name: 'Saved', href: '/saved', current: false },
+      { name: 'Post Contract', href: '/post', current: false },
+    ] : []),
   ];
 
   const handleLogout = () => {
     logout();
-    navigate('/welcome');
+    window.location.href = '/welcome';
   };
 
-  const userNavigation = [
-    { name: 'Your Profile', href: '/profile', icon: UserCircleIcon },
-    { name: 'Notifications', href: '/notifications', icon: BellIcon },
-    { name: 'Saved Contracts', href: '/saved', icon: BookmarkIcon },
-    { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
-  ];
-
   return (
-    <Disclosure as="nav" className="bg-white border-b border-gray-200">
+    <Disclosure as="nav" className="bg-white shadow">
       {({ open }) => (
         <>
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="flex h-16 justify-between">
               <div className="flex">
                 <div className="flex flex-shrink-0 items-center">
-                  <Link to={user ? "/" : "/welcome"} className="text-2xl font-bold text-[#2557a7]">
-                    Sam Shortlist
+                  <Link to="/" className="text-xl font-bold text-primary">
+                    SAM Shortlist
                   </Link>
                 </div>
                 <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
@@ -57,12 +42,11 @@ export default function Header() {
                       key={item.name}
                       to={item.href}
                       className={classNames(
-                        location.pathname === item.href
-                          ? 'border-[#2557a7] text-gray-900'
+                        item.current
+                          ? 'border-primary text-gray-900'
                           : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
                         'inline-flex items-center border-b-2 px-1 pt-1 text-sm font-medium'
                       )}
-                      aria-current={location.pathname === item.href ? 'page' : undefined}
                     >
                       {item.name}
                     </Link>
@@ -73,21 +57,13 @@ export default function Header() {
                 {user ? (
                   <Menu as="div" className="relative ml-3">
                     <div>
-                      <Menu.Button className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#2557a7] focus:ring-offset-2">
+                      <Menu.Button className="flex rounded-full bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
                         <span className="sr-only">Open user menu</span>
-                        {user.avatar ? (
-                          <img
-                            className="h-8 w-8 rounded-full"
-                            src={user.avatar}
-                            alt=""
-                          />
-                        ) : (
-                          <img
-                            className="h-8 w-8 rounded-full"
-                            src="https://images.unsplash.com/photo-1560250097-0b93528c311a?q=80&w=256&auto=format&fit=crop"
-                            alt="Default profile"
-                          />
-                        )}
+                        <img
+                          className="h-8 w-8 rounded-full"
+                          src={user.avatar || "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"}
+                          alt=""
+                        />
                       </Menu.Button>
                     </div>
                     <Transition
@@ -100,43 +76,19 @@ export default function Header() {
                       leaveTo="transform opacity-0 scale-95"
                     >
                       <Menu.Items className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                        <div className="px-4 py-2 text-sm text-gray-900">
-                          <p className="font-medium">{user.name}</p>
-                          <p className="text-gray-500">{user.email}</p>
-                        </div>
-                        <div className="border-t border-gray-100">
-                          {userNavigation.map((item) => (
-                            <Menu.Item key={item.name}>
-                              {({ active }) => (
-                                <Link
-                                  to={item.href}
-                                  className={classNames(
-                                    active ? 'bg-gray-100' : '',
-                                    'flex px-4 py-2 text-sm text-gray-700 items-center'
-                                  )}
-                                >
-                                  <item.icon className="mr-3 h-5 w-5 text-gray-400" aria-hidden="true" />
-                                  {item.name}
-                                </Link>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <button
+                              onClick={handleLogout}
+                              className={classNames(
+                                active ? 'bg-gray-100' : '',
+                                'block w-full px-4 py-2 text-left text-sm text-gray-700'
                               )}
-                            </Menu.Item>
-                          ))}
-                        </div>
-                        <div className="border-t border-gray-100">
-                          <Menu.Item>
-                            {({ active }) => (
-                              <button
-                                onClick={handleLogout}
-                                className={classNames(
-                                  active ? 'bg-gray-100' : '',
-                                  'block w-full text-left px-4 py-2 text-sm text-gray-700'
-                                )}
-                              >
-                                Sign out
-                              </button>
-                            )}
-                          </Menu.Item>
-                        </div>
+                            >
+                              Sign out
+                            </button>
+                          )}
+                        </Menu.Item>
                       </Menu.Items>
                     </Transition>
                   </Menu>
@@ -144,13 +96,13 @@ export default function Header() {
                   <div className="flex items-center space-x-4">
                     <Link
                       to="/signin"
-                      className="text-gray-500 hover:text-gray-700 text-sm font-medium"
+                      className="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium"
                     >
                       Sign in
                     </Link>
                     <Link
                       to="/signup"
-                      className="bg-[#2557a7] text-white hover:bg-[#1c4587] rounded-md px-3 py-2 text-sm font-medium"
+                      className="bg-primary text-white hover:bg-primary-dark px-3 py-2 rounded-md text-sm font-medium"
                     >
                       Sign up
                     </Link>
@@ -158,7 +110,7 @@ export default function Header() {
                 )}
               </div>
               <div className="-mr-2 flex items-center sm:hidden">
-                <Disclosure.Button className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#2557a7]">
+                <Disclosure.Button className="inline-flex items-center justify-center rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary">
                   <span className="sr-only">Open main menu</span>
                   {open ? (
                     <XMarkIcon className="block h-6 w-6" aria-hidden="true" />
@@ -178,45 +130,34 @@ export default function Header() {
                   as={Link}
                   to={item.href}
                   className={classNames(
-                    location.pathname === item.href
-                      ? 'bg-[#2557a7]/5 border-[#2557a7] text-[#2557a7]'
-                      : 'border-transparent text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-800',
+                    item.current
+                      ? 'bg-primary-50 border-primary text-primary'
+                      : 'border-transparent text-gray-500 hover:bg-gray-50 hover:border-gray-300 hover:text-gray-700',
                     'block border-l-4 py-2 pl-3 pr-4 text-base font-medium'
                   )}
-                  aria-current={location.pathname === item.href ? 'page' : undefined}
                 >
                   {item.name}
                 </Disclosure.Button>
               ))}
-            </div>
-            {user && (
-              <div className="border-t border-gray-200 pb-3 pt-4">
-                <div className="px-4 py-2">
-                  <p className="text-base font-medium text-gray-800">{user.name}</p>
-                  <p className="text-sm font-medium text-gray-500">{user.email}</p>
-                </div>
-                <div className="space-y-1">
-                  {userNavigation.map((item) => (
-                    <Disclosure.Button
-                      key={item.name}
-                      as={Link}
-                      to={item.href}
-                      className="flex items-center px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                    >
-                      <item.icon className="mr-3 h-5 w-5 text-gray-400" aria-hidden="true" />
-                      {item.name}
-                    </Disclosure.Button>
-                  ))}
+              {!user && (
+                <div className="border-t border-gray-200 pt-4">
                   <Disclosure.Button
-                    as="button"
-                    onClick={handleLogout}
-                    className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                    as={Link}
+                    to="/signin"
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
                   >
-                    Sign out
+                    Sign in
+                  </Disclosure.Button>
+                  <Disclosure.Button
+                    as={Link}
+                    to="/signup"
+                    className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                  >
+                    Sign up
                   </Disclosure.Button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </Disclosure.Panel>
         </>
       )}

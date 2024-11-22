@@ -4,11 +4,50 @@ import logging
 from typing import Dict, List, Optional
 import requests
 from datetime import datetime, timedelta
+import time
+from functools import wraps
+import pytz
+from .sam_schedule import get_cache_ttl, is_bulk_update_time, get_next_update_time
 
 logger = logging.getLogger(__name__)
 
+def rate_limit(calls: int, period: int):
+    """Rate limiting decorator
+    
+    Args:
+        calls (int): Number of calls allowed in the period
+        period (int): Time period in seconds
+    """
+    def decorator(func):
+        # Store last request timestamps
+        timestamps = []
+        
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            now = time.time()
+            # Remove timestamps outside the window
+            while timestamps and now - timestamps[0] > period:
+                timestamps.pop(0)
+            
+            if len(timestamps) >= calls:
+                sleep_time = timestamps[0] + period - now
+                if sleep_time > 0:
+                    logger.warning(f"Rate limit reached. Waiting {sleep_time:.2f} seconds")
+                    time.sleep(sleep_time)
+                    timestamps.pop(0)
+            
+            timestamps.append(now)
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
+
 class SAMAPIClient:
-    """Client for interacting with the SAM.gov Contract Opportunities API."""
+    """Client for interacting with the SAM.gov Contract Opportunities API.
+    
+    Rate Limits (System Account):
+        - 100,000 requests per day
+        - 60 requests per minute
+    """
     
     def __init__(self, api_key: str):
         """Initialize the SAM API client with authentication."""
@@ -16,7 +55,10 @@ class SAMAPIClient:
         self.base_url = "https://api.sam.gov/opportunities/v2"
         self.desc_url = "https://api.sam.gov/opportunities/v1"
         self.resources_url = "https://api.sam.gov/opportunities/v3"
-        logger.info("SAM API client initialized")
+        self._cache = {}
+        self._last_update = None
+        self._next_update = get_next_update_time()
+        logger.info("SAM API client initialized with System Account limits")
     
     def _build_headers(self) -> Dict[str, str]:
         """Build request headers including authentication."""
@@ -45,6 +87,7 @@ class SAMAPIClient:
         
         return date.strftime("%m/%d/%Y")
     
+    @rate_limit(calls=60, period=60)  # 60 calls per minute
     def search_opportunities(
         self,
         keyword: Optional[str] = None,
@@ -61,7 +104,7 @@ class SAMAPIClient:
         place_of_performance_zipcode: Optional[str] = None
     ) -> Dict:
         """
-        Search contract opportunities with optional filters.
+        Search contract opportunities with optional filters and caching based on SAM.gov's update schedule.
         
         Args:
             keyword: Search term
@@ -80,81 +123,99 @@ class SAMAPIClient:
         Returns:
             Dict containing opportunities and metadata
         """
-        try:
-            # Format dates
-            if not posted_from or not posted_to:
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=90)
-                posted_from = start_date.strftime("%m/%d/%Y")
-                posted_to = end_date.strftime("%m/%d/%Y")
-            else:
-                posted_from = self._format_date(posted_from)
-                posted_to = self._format_date(posted_to)
+        cache_key = f"search:{keyword}:{naics_code}:{set_aside}:{status}:{page}:{limit}:{posted_from}:{posted_to}:{organization_id}:{organization_name}:{place_of_performance_state}:{place_of_performance_zipcode}"
+        current_time = time.time()
+        
+        # Check if we need to refresh cache
+        if (cache_key not in self._cache or 
+            current_time - self._cache[cache_key]['timestamp'] > get_cache_ttl() or
+            datetime.now(pytz.timezone('US/Eastern')) >= self._next_update):
             
-            params = {
-                "limit": str(limit),
-                "offset": str((page - 1) * limit),
-                "postedFrom": posted_from,
-                "postedTo": posted_to,
-                "active": "true"
-            }
+            # Update next update time if we've passed it
+            if datetime.now(pytz.timezone('US/Eastern')) >= self._next_update:
+                self._next_update = get_next_update_time()
             
-            # Add optional filters
-            if keyword:
-                params["q"] = keyword
-            if naics_code:
-                params["naicsCodes"] = naics_code
-            if set_aside:
-                params["setAsides"] = set_aside
-            if status:
-                params["type"] = status
-            if organization_id:
-                params["organizationId"] = organization_id
-            if organization_name:
-                params["organizationName"] = organization_name
-            if place_of_performance_state:
-                params["placeOfPerformanceState"] = place_of_performance_state
-            if place_of_performance_zipcode:
-                params["placeOfPerformanceZipcode"] = place_of_performance_zipcode
-            
-            logger.info(f"Searching opportunities with params: {params}")
-            
-            response = requests.get(
-                f"{self.base_url}/search",
-                headers=self._build_headers(),
-                params=params,
-                timeout=10
-            )
-            
-            if response.status_code == 400:
-                error_msg = response.json().get("errorMessage", "Unknown error")
-                logger.error(f"SAM.gov API error: {error_msg}")
-                raise ValueError(error_msg)
-            
-            response.raise_for_status()
-            data = response.json()
-            
-            # Updated response parsing based on actual SAM.gov API response structure
-            opportunities = data.get("opportunitiesData", [])
-            if isinstance(opportunities, dict):
-                opportunities = [opportunities]
-            
-            return {
-                "opportunities": opportunities,
-                "metadata": {
-                    "total": data.get("totalRecords", 0),
-                    "page": page,
-                    "limit": limit
+            # Make API call and cache results
+            try:
+                # Format dates
+                if not posted_from or not posted_to:
+                    end_date = datetime.now()
+                    start_date = end_date - timedelta(days=90)
+                    posted_from = start_date.strftime("%m/%d/%Y")
+                    posted_to = end_date.strftime("%m/%d/%Y")
+                else:
+                    posted_from = self._format_date(posted_from)
+                    posted_to = self._format_date(posted_to)
+                
+                params = {
+                    "limit": str(limit),
+                    "offset": str((page - 1) * limit),
+                    "postedFrom": posted_from,
+                    "postedTo": posted_to,
+                    "active": "true"
                 }
-            }
-            
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error searching opportunities: {str(e)}")
-            raise
-        except ValueError as e:
-            logger.error(f"Invalid request: {str(e)}")
-            raise
+                
+                # Add optional filters
+                if keyword:
+                    params["q"] = keyword
+                if naics_code:
+                    params["naicsCodes"] = naics_code
+                if set_aside:
+                    params["setAsides"] = set_aside
+                if status:
+                    params["type"] = status
+                if organization_id:
+                    params["organizationId"] = organization_id
+                if organization_name:
+                    params["organizationName"] = organization_name
+                if place_of_performance_state:
+                    params["placeOfPerformanceState"] = place_of_performance_state
+                if place_of_performance_zipcode:
+                    params["placeOfPerformanceZipcode"] = place_of_performance_zipcode
+                
+                logger.info(f"Searching opportunities with params: {params}")
+                
+                response = requests.get(
+                    f"{self.base_url}/search",
+                    headers=self._build_headers(),
+                    params=params,
+                    timeout=10
+                )
+                
+                if response.status_code == 400:
+                    error_msg = response.json().get("errorMessage", "Unknown error")
+                    logger.error(f"SAM.gov API error: {error_msg}")
+                    raise ValueError(error_msg)
+                
+                response.raise_for_status()
+                data = response.json()
+                
+                # Updated response parsing based on actual SAM.gov API response structure
+                opportunities = data.get("opportunitiesData", [])
+                if isinstance(opportunities, dict):
+                    opportunities = [opportunities]
+                
+                self._cache[cache_key] = {
+                    'data': {
+                        "opportunities": opportunities,
+                        "metadata": {
+                            "total": data.get("totalRecords", 0),
+                            "page": page,
+                            "limit": limit
+                        }
+                    },
+                    'timestamp': current_time
+                }
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Error searching opportunities: {str(e)}")
+                raise
+            except ValueError as e:
+                logger.error(f"Invalid request: {str(e)}")
+                raise
+        
+        return self._cache[cache_key]['data']
     
+    @rate_limit(calls=60, period=60)  # 60 calls per minute
     def get_opportunity(self, notice_id: str) -> Dict:
         """
         Get detailed information about a specific opportunity.
@@ -203,6 +264,7 @@ class SAMAPIClient:
             logger.error(f"Invalid request: {str(e)}")
             raise
 
+    @rate_limit(calls=60, period=60)  # 60 calls per minute
     def get_opportunity_description(self, notice_id: str) -> str:
         """
         Get the full description text of an opportunity.
@@ -240,6 +302,7 @@ class SAMAPIClient:
             logger.error(f"Invalid request: {str(e)}")
             raise
 
+    @rate_limit(calls=60, period=60)  # 60 calls per minute
     def get_resource_file(self, resource_id: str) -> bytes:
         """
         Download a resource file associated with an opportunity.
@@ -274,6 +337,7 @@ class SAMAPIClient:
             logger.error(f"Invalid request: {str(e)}")
             raise
 
+    @rate_limit(calls=60, period=60)  # 60 calls per minute
     def get_organizations(self) -> List[Dict]:
         """
         Get a list of organizations that post opportunities.
@@ -332,6 +396,7 @@ class SAMAPIClient:
             logger.error(f"Invalid request: {str(e)}")
             raise
 
+    @rate_limit(calls=60, period=60)  # 60 calls per minute
     def get_setasides(self) -> List[Dict]:
         """
         Get a list of valid set-aside types and codes.

@@ -8,6 +8,7 @@ import SavedPage from './components/SavedPage';
 import SearchPage from './components/SearchPage';
 import WelcomePage from './components/WelcomePage';
 import PostContract from './components/PostContract/PostContract';
+import OpportunityDetails from './components/OpportunityDetails';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -20,9 +21,11 @@ function App() {
           <main className="flex-grow">
             <Routes>
               {/* Public routes */}
-              <Route path="/welcome" element={<WelcomePage />} />
+              <Route path="/welcome" element={<Navigate to="/search" replace />} />
               <Route path="/signin" element={<SignIn />} />
               <Route path="/signup" element={<SignUp />} />
+              <Route path="/search" element={<SearchPage />} />
+              <Route path="/opportunity/:id" element={<OpportunityDetails />} />
               
               {/* Protected routes */}
               <Route
@@ -30,14 +33,6 @@ function App() {
                 element={
                   <ProtectedRoute>
                     <Home />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/search"
-                element={
-                  <ProtectedRoute>
-                    <SearchPage />
                   </ProtectedRoute>
                 }
               />
@@ -51,11 +46,15 @@ function App() {
               />
               <Route
                 path="/post"
-                element={<PostContract />}
+                element={
+                  <ProtectedRoute>
+                    <PostContract />
+                  </ProtectedRoute>
+                }
               />
-
+              
               {/* Default redirect */}
-              <Route path="*" element={<Navigate to="/welcome" replace />} />
+              <Route path="*" element={<Navigate to="/search" replace />} />
             </Routes>
           </main>
           <Footer />
