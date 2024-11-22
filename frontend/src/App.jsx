@@ -9,6 +9,7 @@ import SearchPage from './components/SearchPage';
 import WelcomePage from './components/WelcomePage';
 import PostContract from './components/PostContract/PostContract';
 import OpportunityDetails from './components/OpportunityDetails';
+import DataVisualizationPage from './components/DataVisualizationPage';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import { AuthProvider } from './context/AuthContext';
 
@@ -26,6 +27,7 @@ function App() {
               <Route path="/signup" element={<SignUp />} />
               <Route path="/search" element={<SearchPage />} />
               <Route path="/opportunity/:id" element={<OpportunityDetails />} />
+              <Route path="/data-analysis" element={<DataVisualizationPage />} />
               
               {/* Protected routes */}
               <Route

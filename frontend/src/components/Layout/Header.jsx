@@ -13,6 +13,7 @@ export default function Header() {
 
   const navigation = [
     { name: 'Search', href: '/search', current: true },
+    { name: 'Data Analysis', href: '/data-analysis', current: false },
     ...(user ? [
       { name: 'Saved', href: '/saved', current: false },
       { name: 'Post Contract', href: '/post', current: false },

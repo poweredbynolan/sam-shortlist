@@ -11,9 +11,12 @@ import {
 } from '@heroicons/react/24/outline';
 import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import { searchOpportunities } from '../services/api';
+import { fetchSamData } from '../api/samGovApi';
+import SamDataVisualization from './SamDataVisualization';
 
 export default function SearchPage() {
   const [opportunities, setOpportunities] = useState([]);
+  const [samOpportunities, setSamOpportunities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,7 +29,18 @@ export default function SearchPage() {
 
   useEffect(() => {
     fetchOpportunities();
+    fetchSamOpportunities();
   }, [pagination.page]);
+
+  const fetchSamOpportunities = async () => {
+    try {
+      const data = await fetchSamData();
+      setSamOpportunities(data);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch SAM.gov opportunities');
+      console.error(err);
+    }
+  };
 
   const fetchOpportunities = async () => {
     try {
@@ -131,86 +145,161 @@ export default function SearchPage() {
         </div>
 
         {/* Results */}
-        <div className="mt-8 flow-root">
-          <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-            <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-              {loading ? (
-                <div className="text-center">
-                  <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
-                </div>
-              ) : error ? (
-                <div className="text-center text-red-600">{error}</div>
-              ) : opportunities.length === 0 ? (
-                <div className="text-center text-gray-500">No opportunities found</div>
-              ) : (
-                <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
-                  <div className="min-w-full divide-y divide-gray-300">
-                    {opportunities.map((contract) => (
-                      <div
-                        key={contract.id}
-                        className="bg-white px-4 py-5 sm:px-6 hover:bg-gray-50"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center justify-between">
-                              <Link
-                                to={`/opportunity/${contract.id}`}
-                                className="text-lg font-medium leading-6 text-gray-900 hover:text-primary"
-                              >
-                                {contract.title}
-                              </Link>
-                              <button
-                                onClick={() => handleSaveContract(contract)}
-                                className={`ml-2 rounded-full p-1 ${
-                                  !user
-                                    ? 'text-gray-300 cursor-not-allowed'
-                                    : isContractSaved(contract.id)
-                                    ? 'text-primary hover:bg-gray-100'
-                                    : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500'
-                                }`}
-                                disabled={!user}
-                                title={!user ? 'Sign in to save contracts' : ''}
-                              >
-                                {isContractSaved(contract.id) ? (
-                                  <BookmarkSolidIcon className="h-6 w-6" aria-hidden="true" />
-                                ) : (
-                                  <BookmarkIcon className="h-6 w-6" aria-hidden="true" />
-                                )}
-                              </button>
-                            </div>
-                            <div className="mt-2 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
-                              <div className="mt-2 flex items-center text-sm text-gray-500">
-                                <BuildingOfficeIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
-                                {contract.agency}
+        <div className="py-6">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
+            <h1 className="text-2xl font-semibold text-gray-900">Search Opportunities</h1>
+          </div>
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 md:px-8">
+            <div className="py-4">
+              <div className="mb-8">
+                <SamDataVisualization data={samOpportunities} />
+              </div>
+              <div className="mt-8 flow-root">
+                <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                  <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                    {loading ? (
+                      <div className="text-center">
+                        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
+                      </div>
+                    ) : error ? (
+                      <div className="text-center text-red-600">{error}</div>
+                    ) : opportunities.length === 0 && samOpportunities.length === 0 ? (
+                      <div className="text-center text-gray-500">No opportunities found</div>
+                    ) : (
+                      <div className="overflow-hidden shadow ring-1 ring-black ring-opacity-5 sm:rounded-lg">
+                        <div className="min-w-full divide-y divide-gray-300">
+                          {opportunities.map((contract) => (
+                            <div
+                              key={contract.id}
+                              className="bg-white px-4 py-5 sm:px-6 hover:bg-gray-50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <Link
+                                      to={`/opportunity/${contract.id}`}
+                                      className="text-lg font-medium leading-6 text-gray-900 hover:text-primary"
+                                    >
+                                      {contract.title}
+                                    </Link>
+                                    <button
+                                      onClick={() => handleSaveContract(contract)}
+                                      className={`ml-2 rounded-full p-1 ${
+                                        !user
+                                          ? 'text-gray-300 cursor-not-allowed'
+                                          : isContractSaved(contract.id)
+                                          ? 'text-primary hover:bg-gray-100'
+                                          : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500'
+                                      }`}
+                                      disabled={!user}
+                                      title={!user ? 'Sign in to save contracts' : ''}
+                                    >
+                                      {isContractSaved(contract.id) ? (
+                                        <BookmarkSolidIcon className="h-6 w-6" aria-hidden="true" />
+                                      ) : (
+                                        <BookmarkIcon className="h-6 w-6" aria-hidden="true" />
+                                      )}
+                                    </button>
+                                  </div>
+                                  <div className="mt-2 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
+                                    <div className="mt-2 flex items-center text-sm text-gray-500">
+                                      <BuildingOfficeIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                                      {contract.agency}
+                                    </div>
+                                    <div className="mt-2 flex items-center text-sm text-gray-500">
+                                      <CurrencyDollarIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                                      {formatCurrency(contract.estimatedValue)}
+                                    </div>
+                                    <div className="mt-2 flex items-center text-sm text-gray-500">
+                                      <CalendarIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                                      Due {new Date(contract.dueDate).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                  <p className="mt-2 text-sm text-gray-500">{contract.description}</p>
+                                  <div className="mt-4 flex items-center space-x-4">
+                                    <button className="text-sm font-medium text-primary hover:text-primary-dark">
+                                      View Details
+                                    </button>
+                                    <span className="text-sm text-gray-500">
+                                      Posted {new Date(contract.postedDate).toLocaleDateString()}
+                                    </span>
+                                    <span className="text-sm text-gray-500">
+                                      {contract.solicitation}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="mt-2 flex items-center text-sm text-gray-500">
-                                <CurrencyDollarIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
-                                {formatCurrency(contract.estimatedValue)}
-                              </div>
-                              <div className="mt-2 flex items-center text-sm text-gray-500">
-                                <CalendarIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
-                                Due {new Date(contract.dueDate).toLocaleDateString()}
+                            </div>
+                          ))}
+                          {samOpportunities.map((contract) => (
+                            <div
+                              key={contract.id}
+                              className="bg-white px-4 py-5 sm:px-6 hover:bg-gray-50"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center justify-between">
+                                    <Link
+                                      to={`/opportunity/${contract.id}`}
+                                      className="text-lg font-medium leading-6 text-gray-900 hover:text-primary"
+                                    >
+                                      {contract.title}
+                                    </Link>
+                                    <button
+                                      onClick={() => handleSaveContract(contract)}
+                                      className={`ml-2 rounded-full p-1 ${
+                                        !user
+                                          ? 'text-gray-300 cursor-not-allowed'
+                                          : isContractSaved(contract.id)
+                                          ? 'text-primary hover:bg-gray-100'
+                                          : 'text-gray-400 hover:bg-gray-100 hover:text-gray-500'
+                                      }`}
+                                      disabled={!user}
+                                      title={!user ? 'Sign in to save contracts' : ''}
+                                    >
+                                      {isContractSaved(contract.id) ? (
+                                        <BookmarkSolidIcon className="h-6 w-6" aria-hidden="true" />
+                                      ) : (
+                                        <BookmarkIcon className="h-6 w-6" aria-hidden="true" />
+                                      )}
+                                    </button>
+                                  </div>
+                                  <div className="mt-2 flex flex-col sm:flex-row sm:flex-wrap sm:space-x-6">
+                                    <div className="mt-2 flex items-center text-sm text-gray-500">
+                                      <BuildingOfficeIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                                      {contract.agency}
+                                    </div>
+                                    <div className="mt-2 flex items-center text-sm text-gray-500">
+                                      <CurrencyDollarIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                                      {formatCurrency(contract.estimatedValue)}
+                                    </div>
+                                    <div className="mt-2 flex items-center text-sm text-gray-500">
+                                      <CalendarIcon className="mr-1.5 h-5 w-5 flex-shrink-0 text-gray-400" aria-hidden="true" />
+                                      Due {new Date(contract.dueDate).toLocaleDateString()}
+                                    </div>
+                                  </div>
+                                  <p className="mt-2 text-sm text-gray-500">{contract.description}</p>
+                                  <div className="mt-4 flex items-center space-x-4">
+                                    <button className="text-sm font-medium text-primary hover:text-primary-dark">
+                                      View Details
+                                    </button>
+                                    <span className="text-sm text-gray-500">
+                                      Posted {new Date(contract.postedDate).toLocaleDateString()}
+                                    </span>
+                                    <span className="text-sm text-gray-500">
+                                      {contract.solicitation}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
-                            <p className="mt-2 text-sm text-gray-500">{contract.description}</p>
-                            <div className="mt-4 flex items-center space-x-4">
-                              <button className="text-sm font-medium text-primary hover:text-primary-dark">
-                                View Details
-                              </button>
-                              <span className="text-sm text-gray-500">
-                                Posted {new Date(contract.postedDate).toLocaleDateString()}
-                              </span>
-                              <span className="text-sm text-gray-500">
-                                {contract.solicitation}
-                              </span>
-                            </div>
-                          </div>
+                          ))}
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
