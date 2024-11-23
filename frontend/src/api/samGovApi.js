@@ -4,7 +4,63 @@ import { setCookie, getCookie, COOKIE_KEYS } from '../utils/cookieManager';
 import { storageService } from '../services/storageService';
 
 const API_KEY = import.meta.env.VITE_SAM_API_KEY;
-const PROXY_URL = 'http://localhost:3001/api/sam/opportunities';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+const PROXY_URL = `${API_BASE_URL}/api/opportunities`;
+
+// Helper function to convert dateRange to posted_from and posted_to
+const getDateRange = (dateRange) => {
+  const end_date = new Date();
+  let start_date;
+  
+  switch(dateRange) {
+    case '1month':
+      start_date = new Date(end_date);
+      start_date.setMonth(end_date.getMonth() - 1);
+      break;
+    case '3months':
+      start_date = new Date(end_date);
+      start_date.setMonth(end_date.getMonth() - 3);
+      break;
+    default:
+      start_date = new Date(end_date);
+      start_date.setMonth(end_date.getMonth() - 1);
+  }
+  
+  return {
+    posted_from: start_date.toLocaleDateString('en-US'),
+    posted_to: end_date.toLocaleDateString('en-US')
+  };
+};
+
+// API configuration
+const apiClient = axios.create({
+  baseURL: PROXY_URL,
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  withCredentials: true,  // Enable sending credentials
+  timeout: 10000  // 10 second timeout
+});
+
+// Add request interceptor to add Authorization header
+apiClient.interceptors.request.use((config) => {
+  config.headers['Authorization'] = `Bearer ${API_KEY}`;
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+// Add response interceptor for better error handling
+apiClient.interceptors.response.use((response) => {
+  return response;
+}, (error) => {
+  console.error('SAM.gov API request failed:', {
+    timestamp: new Date().toISOString(),
+    duration: `${performance.now()}ms`,
+    ...error
+  });
+  return Promise.reject(error);
+});
 
 // Log initialization status
 console.log('Initializing SAM.gov API client:', {
@@ -66,6 +122,12 @@ export const fetchSamData = async (params = {}) => {
       dateRange: params.dateRange || userPrefs.dateRange
     };
 
+    // Convert dateRange to posted_from and posted_to
+    const dateRange = getDateRange(enrichedParams.dateRange);
+    enrichedParams.posted_from = dateRange.posted_from;
+    enrichedParams.posted_to = dateRange.posted_to;
+    delete enrichedParams.dateRange;
+
     // Start tracking performance
     const perfMetrics = {
       requestId,
@@ -121,8 +183,23 @@ export const fetchSamData = async (params = {}) => {
     });
 
     // Make API request
-    const response = await axios.get('/api/sam/opportunities', { params: enrichedParams });
+    const response = await apiClient.get('', { 
+      params: enrichedParams
+    });
     const duration = performance.now() - startTime;
+
+    // Transform response data for visualization
+    const transformedData = {
+      success: true,
+      opportunities: response.data.opportunityData?.map(opp => ({
+        label: opp.title || opp.solicitationNumber,
+        value: 1,  // Count each opportunity as 1 for the chart
+        importance: opp.importance || 'normal',
+        type: opp.type || 'unknown',
+        postedDate: opp.postedDate,
+        ...opp
+      })) || []
+    };
 
     // Update performance metrics
     perfMetrics.duration = duration;
@@ -131,12 +208,12 @@ export const fetchSamData = async (params = {}) => {
     await storageService.storePerformanceMetrics(perfMetrics);
 
     // Store successful response
-    if (response.data.success) {
-      await storageService.storeOpportunity(cacheKey, response.data);
+    if (transformedData.opportunities.length > 0) {
+      await storageService.storeOpportunity(cacheKey, transformedData);
 
       // Queue important data for offline access
-      if (response.data.opportunities?.some(opp => opp.importance === 'high')) {
-        await storageService.queueForOffline(response.data);
+      if (transformedData.opportunities.some(opp => opp.importance === 'high')) {
+        await storageService.queueForOffline(transformedData);
       }
     }
 
@@ -146,19 +223,10 @@ export const fetchSamData = async (params = {}) => {
       source: 'api',
       params: enrichedParams,
       duration,
-      resultCount: response.data.opportunities?.length || 0
+      resultCount: transformedData.opportunities.length
     });
 
-    return {
-      ...response.data,
-      userPreferences: userPrefs,
-      recentSearches: await getCookie(COOKIE_KEYS.RECENT_SEARCHES) || [],
-      metrics: {
-        duration: `${duration.toFixed(2)}ms`,
-        timestamp: new Date().toISOString(),
-        cached: false
-      }
-    };
+    return transformedData;
 
   } catch (error) {
     const duration = performance.now() - startTime;

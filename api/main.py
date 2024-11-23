@@ -3,7 +3,7 @@
 import os
 import logging
 from typing import Optional
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import FastAPI, HTTPException, Query, Response, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -32,28 +32,35 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173"],  # Frontend dev server
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-def get_sam_client() -> SAMAPIClient:
+async def get_api_key(authorization: str = Header(...)) -> str:
+    """Extract API key from Authorization header."""
+    if not authorization.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail="Invalid authorization header")
+    return authorization.replace('Bearer ', '')
+
+def get_sam_client(api_key: str = Depends(get_api_key)) -> SAMAPIClient:
     """Get an authenticated SAM.gov API client."""
-    api_key = os.getenv("SAM_API_KEY")
     if not api_key:
-        raise ValueError("SAM_API_KEY environment variable not set")
+        raise HTTPException(status_code=401, detail="API key is required")
     return SAMAPIClient(api_key)
 
 @app.get("/")
 async def root():
     """Root endpoint serving the frontend."""
-    return FileResponse("index.html")
+    return FileResponse('index.html')
 
 @app.get("/api/opportunities")
 async def search_opportunities(
+    client: SAMAPIClient = Depends(get_sam_client),
     q: Optional[str] = Query(None, description="Search term"),
     naics_codes: Optional[str] = Query(None, description="NAICS code filter (comma-separated)"),
     set_asides: Optional[str] = Query(None, description="Set-aside type (e.g., 'SBA', 'WOSB')"),
@@ -67,11 +74,8 @@ async def search_opportunities(
     state: Optional[str] = Query(None, description="Filter by state code (e.g., 'CA')"),
     zipcode: Optional[str] = Query(None, description="Filter by ZIP code")
 ):
-    """
-    Search contract opportunities with optional filters.
-    """
+    """Search contract opportunities with optional filters."""
     try:
-        client = get_sam_client()
         return client.search_opportunities(
             keyword=q,
             naics_code=naics_codes,
@@ -94,12 +98,11 @@ async def search_opportunities(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/opportunities/{notice_id}")
-async def get_opportunity(notice_id: str):
+async def get_opportunity(notice_id: str, client: SAMAPIClient = Depends(get_sam_client)):
     """
     Get detailed information about a specific opportunity.
     """
     try:
-        client = get_sam_client()
         return client.get_opportunity(notice_id)
     except ValueError as e:
         logger.error(f"Invalid request: {str(e)}")
@@ -109,12 +112,11 @@ async def get_opportunity(notice_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/opportunities/{notice_id}/description")
-async def get_opportunity_description(notice_id: str):
+async def get_opportunity_description(notice_id: str, client: SAMAPIClient = Depends(get_sam_client)):
     """
     Get the full description text of an opportunity.
     """
     try:
-        client = get_sam_client()
         return {"description": client.get_opportunity_description(notice_id)}
     except ValueError as e:
         logger.error(f"Invalid request: {str(e)}")
@@ -124,12 +126,11 @@ async def get_opportunity_description(notice_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/opportunities/resources/{resource_id}")
-async def get_resource_file(resource_id: str):
+async def get_resource_file(resource_id: str, client: SAMAPIClient = Depends(get_sam_client)):
     """
     Download a resource file associated with an opportunity.
     """
     try:
-        client = get_sam_client()
         content = client.get_resource_file(resource_id)
         return Response(content=content)
     except ValueError as e:
@@ -140,12 +141,11 @@ async def get_resource_file(resource_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/organizations")
-async def get_organizations():
+async def get_organizations(client: SAMAPIClient = Depends(get_sam_client)):
     """
     Get a list of organizations that post opportunities.
     """
     try:
-        client = get_sam_client()
         return client.get_organizations()
     except ValueError as e:
         logger.error(f"Invalid request: {str(e)}")
@@ -155,12 +155,11 @@ async def get_organizations():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/setasides")
-async def get_setasides():
+async def get_setasides(client: SAMAPIClient = Depends(get_sam_client)):
     """
     Get a list of valid set-aside types and codes.
     """
     try:
-        client = get_sam_client()
         return client.get_setasides()
     except ValueError as e:
         logger.error(f"Invalid request: {str(e)}")

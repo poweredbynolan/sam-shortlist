@@ -1,21 +1,37 @@
 import express from 'express';
 import cors from 'cors';
 import axios from 'axios';
-import dotenv from 'dotenv';
+import { config } from 'dotenv';
 import Redis from 'ioredis';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-dotenv.config();
+// Get the directory name of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+config();
 
 // Initialize server
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const SAM_API_URL = 'https://api.sam.gov/opportunities/v2/search';
 
-// Initialize Redis client
-const redis = new Redis();
+// Initialize Redis client if configured
+let redis;
+try {
+  if (process.env.REDIS_URL) {
+    redis = new Redis(process.env.REDIS_URL);
+    console.log('Redis connected successfully');
+  } else {
+    console.log('Redis URL not configured, running without cache');
+  }
+} catch (error) {
+  console.warn('Redis connection failed, continuing without caching:', error.message);
+}
 
 // Cache configuration
 const CACHE_TTL = 3600; // 1 hour in seconds
@@ -23,8 +39,7 @@ const CACHE_KEY_PREFIX = 'sam:opportunities:';
 
 // Helper function to generate cache key
 const generateCacheKey = (params) => {
-  const key = `${CACHE_KEY_PREFIX}${params.postedFrom}:${params.postedTo}:${params.limit}:${params.offset}`;
-  return key;
+  return `${CACHE_KEY_PREFIX}${JSON.stringify(params)}`;
 };
 
 // Log server initialization
@@ -118,8 +133,16 @@ app.get('/api/sam/opportunities', async (req, res) => {
     // Generate cache key
     const cacheKey = generateCacheKey(params);
 
-    // Try to get data from cache first
-    const cachedData = await redis.get(cacheKey);
+    // Try to get data from cache first if Redis is available
+    let cachedData;
+    if (redis) {
+      try {
+        cachedData = await redis.get(cacheKey);
+      } catch (error) {
+        console.warn('Redis get failed:', error.message);
+      }
+    }
+
     if (cachedData) {
       console.log('Cache hit:', {
         id: requestId,
@@ -131,8 +154,7 @@ app.get('/api/sam/opportunities', async (req, res) => {
       const parsedData = JSON.parse(cachedData);
       return res.json({
         success: true,
-        data: parsedData.opportunities,
-        total: parsedData.totalRecords,
+        data: parsedData,
         fromCache: true
       });
     }
@@ -178,38 +200,58 @@ app.get('/api/sam/opportunities', async (req, res) => {
     }
 
     // Transform the response data
-    const opportunities = response.data.opportunitiesData || [];
-    
-    console.log('Processing complete:', {
-      id: requestId,
-      timestamp: new Date().toISOString(),
-      duration: `${Date.now() - requestStart}ms`,
-      opportunitiesCount: opportunities.length,
-      dataTypes: [...new Set(opportunities.map(opp => opp.type))]
-    });
+    const opportunities = (response.data.opportunitiesData || []).map(opp => ({
+      title: opp.title || 'Untitled Opportunity',
+      solicitationNumber: opp.solicitationNumber,
+      type: opp.type || opp.noticeType || 'Unknown',
+      postedDate: opp.postedDate,
+      responseDeadline: opp.responseDeadline,
+      description: opp.description,
+      department: opp.department,
+      subtier: opp.subtier,
+      office: opp.office,
+      location: opp.placeOfPerformance,
+      naicsCode: opp.naicsCode,
+      value: 1  // For visualization counting
+    }));
 
-    // Cache the successful response
-    const cacheData = {
+    // Group opportunities by type for visualization
+    const opportunitiesByType = opportunities.reduce((acc, opp) => {
+      acc[opp.type] = (acc[opp.type] || 0) + 1;
+      return acc;
+    }, {});
+
+    const transformedData = {
       opportunities,
-      totalRecords: response.data.totalRecords || 0
+      opportunitiesByType,
+      totalRecords: response.data.totalRecords || 0,
+      metadata: {
+        types: Object.keys(opportunitiesByType),
+        counts: Object.values(opportunitiesByType)
+      }
     };
-    
-    await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(cacheData));
-    
-    console.log('Data cached:', {
-      id: requestId,
-      timestamp: new Date().toISOString(),
-      cacheKey,
-      ttl: CACHE_TTL,
-      dataSize: JSON.stringify(cacheData).length
-    });
+
+    // Cache the successful response if Redis is available
+    if (redis) {
+      try {
+        await redis.setex(cacheKey, CACHE_TTL, JSON.stringify(transformedData));
+        console.log('Data cached:', {
+          id: requestId,
+          timestamp: new Date().toISOString(),
+          cacheKey,
+          ttl: CACHE_TTL,
+          dataSize: JSON.stringify(transformedData).length
+        });
+      } catch (error) {
+        console.warn('Redis set failed:', error.message);
+      }
+    }
 
     res.json({
       success: true,
-      data: opportunities,
-      total: response.data.totalRecords || 0
+      data: transformedData,
+      fromCache: false
     });
-
   } catch (error) {
     const errorDetails = {
       id: requestId,

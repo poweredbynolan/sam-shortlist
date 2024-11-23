@@ -13,12 +13,9 @@ import { BookmarkIcon as BookmarkSolidIcon } from '@heroicons/react/24/solid';
 import { searchOpportunities } from '../services/api';
 import { fetchSamData } from '../api/samGovApi';
 import SamDataVisualization from './SamDataVisualization';
+import { useApi } from '../hooks/useApi';
 
 export default function SearchPage() {
-  const [opportunities, setOpportunities] = useState([]);
-  const [samOpportunities, setSamOpportunities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [pagination, setPagination] = useState({
     total: 0,
@@ -27,126 +24,31 @@ export default function SearchPage() {
   });
   const { user, saveContract, unsaveContract, isContractSaved } = useAuth();
 
-  useEffect(() => {
-    fetchOpportunities();
-    fetchSamOpportunities();
-  }, [pagination.page]);
-
-  const fetchSamOpportunities = async () => {
-    const startTime = Date.now();
-    try {
-      console.log('Initiating SAM.gov opportunities fetch:', {
-        timestamp: new Date().toISOString(),
-        component: 'SearchPage'
-      });
-
-      const data = await fetchSamData();
-      
-      console.log('SAM.gov opportunities fetch complete:', {
-        timestamp: new Date().toISOString(),
-        duration: `${Date.now() - startTime}ms`,
-        dataPoints: data.length,
-        categories: data.map(d => d.label)
-      });
-
-      setSamOpportunities(data);
-    } catch (err) {
-      const errorDetails = {
-        timestamp: new Date().toISOString(),
-        duration: `${Date.now() - startTime}ms`,
-        component: 'SearchPage',
-        function: 'fetchSamOpportunities',
-        error: {
-          name: err.name,
-          message: err.message,
-          stack: err.stack,
-          details: err.details // From enhanced API error
-        }
-      };
-
-      console.error('Failed to fetch SAM.gov opportunities:', errorDetails);
-      setError(err.message || 'Failed to fetch SAM.gov opportunities');
-    }
+  const fetchSamOpportunities = async (page) => {
+    const data = await fetchSamData(page);
+    return { data, total: data.length };
   };
 
-  const fetchOpportunities = async () => {
-    const startTime = Date.now();
-    try {
-      console.log('Initiating opportunities search:', {
-        timestamp: new Date().toISOString(),
-        query: searchQuery,
-        pagination: {
-          page: pagination.page,
-          pageSize: pagination.pageSize
-        }
-      });
-
-      setLoading(true);
-      const result = await searchOpportunities({
-        query: searchQuery,
-        page: pagination.page,
-        pageSize: pagination.pageSize
-      });
-      
-      console.log('Search completed successfully:', {
-        timestamp: new Date().toISOString(),
-        duration: `${Date.now() - startTime}ms`,
-        totalResults: result.total,
-        currentPage: pagination.page,
-        resultsReturned: result.opportunities.length
-      });
-
-      setOpportunities(result.opportunities);
-      setPagination(prev => ({
-        ...prev,
-        total: result.total
-      }));
-    } catch (err) {
-      const errorDetails = {
-        timestamp: new Date().toISOString(),
-        duration: `${Date.now() - startTime}ms`,
-        component: 'SearchPage',
-        function: 'fetchOpportunities',
-        searchParams: {
-          query: searchQuery,
-          page: pagination.page,
-          pageSize: pagination.pageSize
-        },
-        error: {
-          name: err.name,
-          message: err.message,
-          stack: err.stack
-        }
-      };
-
-      console.error('Failed to fetch opportunities:', errorDetails);
-      setError(err.message || 'Failed to fetch opportunities');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    console.log('Search initiated:', {
-      timestamp: new Date().toISOString(),
+  const fetchOpportunities = async (page) => {
+    return await searchOpportunities({
       query: searchQuery,
-      currentPage: pagination.page
+      page: page,
+      pageSize: pagination.pageSize
     });
+  };
 
-    setPagination(prev => ({ ...prev, page: 1 }));
-    await fetchOpportunities();
+  const { data: samOpportunities, loading: samLoading, error: samError, setPage: setSamPage } = useApi(fetchSamOpportunities, [searchQuery]);
+  const { data: opportunities, loading, error, setPage } = useApi(fetchOpportunities, [searchQuery]);
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setPage(1);
+    setSamPage(1);
   };
 
   const handlePageChange = (newPage) => {
-    console.log('Page change:', {
-      timestamp: new Date().toISOString(),
-      previousPage: pagination.page,
-      newPage: newPage,
-      totalPages: Math.ceil(pagination.total / pagination.pageSize)
-    });
-
-    setPagination(prev => ({ ...prev, page: newPage }));
+    setPage(newPage);
+    setSamPage(newPage);
   };
 
   const handleSaveContract = async (contract) => {
@@ -271,12 +173,12 @@ export default function SearchPage() {
               <div className="mt-8 flow-root">
                 <div className="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
                   <div className="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                    {loading ? (
+                    {(loading || samLoading) ? (
                       <div className="text-center">
                         <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent align-[-0.125em] motion-reduce:animate-[spin_1.5s_linear_infinite]" />
                       </div>
-                    ) : error ? (
-                      <div className="text-center text-red-600">{error}</div>
+                    ) : (error || samError) ? (
+                      <div className="text-center text-red-600">{error || samError}</div>
                     ) : opportunities.length === 0 && samOpportunities.length === 0 ? (
                       <div className="text-center text-gray-500">No opportunities found</div>
                     ) : (
