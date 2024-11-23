@@ -33,14 +33,26 @@ const DataVisualizationPage = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        const data = await fetchSamData();
+        const response = await fetchSamData({
+          limit: 10,
+          dateRange: '1month'
+        });
+        console.log('API Response:', response);
+        
+        if (!response) {
+          throw new Error('Invalid data format received');
+        }
+
+        const opportunities = response.opportunities || [];
+        const types = opportunities.map(opportunity => opportunity.type);
+        const counts = opportunities.map(opportunity => opportunity.count);
         
         const processedData = {
-          labels: data.map(item => item.label),
+          labels: types,
           datasets: [
             {
               label: 'Contract Opportunities by Type',
-              data: data.map(item => item.value),
+              data: counts,
               backgroundColor: [
                 'rgba(255, 99, 132, 0.5)',
                 'rgba(54, 162, 235, 0.5)',
